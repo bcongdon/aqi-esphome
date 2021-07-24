@@ -1,0 +1,93 @@
+esphome:
+  name: climate
+  platform: ESP8266
+  board: d1_mini_pro
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  password: ""
+
+captive_portal:
+
+i2c:
+  sda: D2
+  scl: D1
+
+color:
+  - id: my_red
+    red: 100%
+    green: 3%
+    blue: 5%
+
+font:
+  - file: "fonts/OpenSans-Regular.ttf"
+    id: opensans
+    size: 10
+
+display:
+  - platform: ssd1306_i2c
+    id: oled
+    model: "SSD1306 64x48"
+    pages:
+      - id: page1
+        lambda: |-
+          it.printf(0, 0, id(opensans), "CO2:");
+          it.printf(it.get_width(), 10, id(opensans), TextAlign::TOP_RIGHT, "%.0fppm", id(co2).state);
+          it.printf(0, 20, id(opensans), "PM25: %.0f", id(pm25).state);
+          it.strftime(0, 30, id(opensans), "%H:%M", id(sntp_time).now());
+      - id: page2
+        lambda: |-
+          it.printf(0, 0, id(opensans), "Temp: %.0fC", id(temp).state);
+          it.printf(0, 10, id(opensans), "Hmdty: %.0f", id(humidity).state);
+          it.strftime(0, 30, id(opensans), "%H:%M", id(sntp_time).now());
+
+time:
+  - platform: sntp
+    id: sntp_time
+
+interval:
+  - interval: 5s
+    then:
+      - display.page.show_next: oled
+      - component.update: oled
+
+uart:
+  - rx_pin: D5
+    tx_pin: D6
+    baud_rate: 9600
+    id: uart1
+  - rx_pin: D4
+    tx_pin: D3
+    baud_rate: 9600
+    id: uart2
+
+sensor:
+  - platform: sht3xd
+    temperature:
+      id: temp
+      name: "Temperature"
+      filters:
+        - lambda: return x * (9.0/5.0) + 32.0;
+    humidity:
+      id: humidity
+      name: "Humidity"
+    address: 0x44
+    update_interval: 5s
+  - platform: pmsx003
+    type: PMS5003T
+    uart_id: uart1
+    pm_2_5:
+      id: pm25
+      name: "Particulate Matter <2.5µm Concentration"
+  - platform: senseair
+    uart_id: uart2
+    co2:
+      id: co2
+      name: "SenseAir CO2 Value"
+    update_interval: 60s
